@@ -1,5 +1,5 @@
 # Hyperledger Fabric Util
-This module provides wrapper functions for interacting with hyperledger fabric using (hfc)[https://www.npmjs.com/package/hfc] node module.
+This module provides wrapper functions for interacting with hyperledger fabric using [hfc](https://www.npmjs.com/package/hfc) node module.
 
 ## Usage
 1. Install node module
