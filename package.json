@@ -1,0 +1,28 @@
+{
+  "name": "hfc-util",
+  "version": "0.0.1",
+  "description": "Wrapper functions for interacting with hyperledger fabric using hfc",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/predix/hfc-util.git"
+  },
+  "keywords": [
+    "hfc",
+    "blockchain",
+    "hyperledger",
+    "fabric"
+  ],
+  "author": "Atul Kshirsagar",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/predix/hfc-util/issues"
+  },
+  "homepage": "https://github.com/predix/hfc-util#readme",
+  "dependencies": {
+    "bluebird": "^3.5.0",
+    "debug": "^2.6.6",
+    "hfc": "^0.6.1",
+    "vault-hfc-kvstore": "0.0.2"
+  }
+}
