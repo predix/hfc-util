@@ -76,7 +76,7 @@ function getRegistrar() {
     return chain.getRegistrar();
 }
 
-function* registerUser(name, affiliation) {
+function* registerUser(name, affiliation, isRegistrar=false, attrs) {
     debug("Entering registerUser");
     var user = yield* getUser(name);
     var registerUsr = bluebird.promisify(user.register, {
@@ -86,41 +86,66 @@ function* registerUser(name, affiliation) {
         enrollmentID: name,
         affiliation: affiliation
     };
+    if (isRegistrar) {
+        debug('Registering user as registrar')
+        registrationRequest.registrar = {
+            roles: ['client'],
+            delegateRoles: ['client']
+        }
+    }
+    if (attrs !== undefined) {
+        registrationRequest.attributes = attrs;
+    }
     var secret = yield registerUsr(registrationRequest);
     debug("Registered user", name);
     return secret;
 }
 
-function* deployChaincode(user, args, chaincodePath) {
+function* getTCert(user, attrs) {
+    debug("Getting TCert for user");
+    var getTCert = bluebird.promisify(user.getUserCert, {
+        context: user
+    });
+    var cert = yield getTCert(attrs)
+    return cert
+}
+
+function* deployChaincode(user, args, chaincodePath, attrs=null) {
     debug("Entering deployChaincode");
+    var cert = yield* getTCert(user, attrs);
     var deployRequest = {
         chaincodePath: chaincodePath,
         fcn: "init",
-        args: args
+        args: args,
+        userCert: cert
     }
     var deployTx = user.deploy(deployRequest);
     debug("Submitted deploy transaction");
     return deployTx;
 }
 
-function* queryChaincode(user, args, chaincodeID) {
+function* queryChaincode(user, fn, args, chaincodeID, attrs=null) {
     debug("Entering queryChaincode");
+    var cert = yield* getTCert(user, attrs);
     var queryRequest = {
         chaincodeID: chaincodeID,
-        fcn: "query",
-        args: args
+        fcn: fn,
+        args: args,
+        userCert: cert
     }
     var queryTx = user.query(queryRequest);
     debug("Submitted query transaction");
     return queryTx;
 }
 
-function* invokeChaincode(user, fn, args, chaincodeID) {
+function* invokeChaincode(user, fn, args, chaincodeID, attrs=null) {
     debug("Entering invokeChaincode");
+    var cert = yield* getTCert(user, attrs);
     var invokeRequest = {
         chaincodeID: chaincodeID,
         fcn: fn,
-        args: args
+        args: args,
+        userCert: cert
     }
     var invokeTx = user.invoke(invokeRequest);
     debug("Submitted invoke transaction");
