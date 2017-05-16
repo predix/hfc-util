@@ -126,12 +126,13 @@ function* deployChaincode(user, args, chaincodePath, attrs=null) {
 
 function* queryChaincode(user, fn, args, chaincodeID, attrs=null) {
     debug("Entering queryChaincode");
-    var cert = yield* getTCert(user, attrs);
     var queryRequest = {
         chaincodeID: chaincodeID,
         fcn: fn,
-        args: args,
-        userCert: cert
+        args: args
+    }
+    if (attrs != null) {
+        queryRequest.attrs = attrs;
     }
     var queryTx = user.query(queryRequest);
     debug("Submitted query transaction");
@@ -140,12 +141,13 @@ function* queryChaincode(user, fn, args, chaincodeID, attrs=null) {
 
 function* invokeChaincode(user, fn, args, chaincodeID, attrs=null) {
     debug("Entering invokeChaincode");
-    var cert = yield* getTCert(user, attrs);
     var invokeRequest = {
         chaincodeID: chaincodeID,
         fcn: fn,
-        args: args,
-        userCert: cert
+        args: args
+    }
+    if (attrs != null) {
+        invokeRequest.attrs = attrs;
     }
     var invokeTx = user.invoke(invokeRequest);
     debug("Submitted invoke transaction");
