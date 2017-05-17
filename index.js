@@ -92,6 +92,8 @@ function* registerUser(name, affiliation, isRegistrar=false, attrs) {
             roles: ['client'],
             delegateRoles: ['client']
         }
+    } else {
+        registrationRequest.roles = ['client'];
     }
     if (attrs !== undefined) {
         registrationRequest.attributes = attrs;
