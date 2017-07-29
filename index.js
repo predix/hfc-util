@@ -8,7 +8,7 @@ var debug = require('debug')('hfc-util')
 
 var chain
 
-function * setupChain (chainName, caAddr, peers, eventHubUrls, keystoreLocation, vaultUrl, vaultToken) {
+function * setupChain (chainName, caAddr, peers, eventHubUrls, keystoreLocation, vaultUrl, vaultToken, devMode) {
   chain = hfc.newChain(chainName)
   debug('Adding membership service ', caAddr)
   chain.setMemberServicesUrl('grpc://' + caAddr)
@@ -34,6 +34,10 @@ function * setupChain (chainName, caAddr, peers, eventHubUrls, keystoreLocation,
     chain.setKeyValStore(fileKVStore)
   } else {
     debug('Vault or file store location was not specified. Subsequent calls will fail!')
+  }
+  if(devMode !== undefined) {
+    debug('Setting devmode of chain to ', devMode)
+    chain.setDevMode(devMode)
   }
 }
 
