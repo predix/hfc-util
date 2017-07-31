@@ -7,8 +7,10 @@ var vaultkv = require('vault-hfc-kvstore')
 var debug = require('debug')('hfc-util')
 
 var chain
+var eventHubUrls
+var currentPeerForEventHub = -1
 
-function * setupChain (chainName, caAddr, peers, eventHubUrls, keystoreLocation, vaultUrl, vaultToken, devMode) {
+function* setupChain(chainName, caAddr, peers, ehUrls, keystoreLocation, vaultUrl, vaultToken, devMode) {
   chain = hfc.newChain(chainName)
   debug('Adding membership service ', caAddr)
   chain.setMemberServicesUrl('grpc://' + caAddr)
@@ -16,13 +18,6 @@ function * setupChain (chainName, caAddr, peers, eventHubUrls, keystoreLocation,
     debug('Adding peer ', peer)
     chain.addPeer('grpc://' + peer)
   })
-  if (eventHubUrls != undefined) {
-    var eventUrls = eventHubUrls.split(',')
-    if (eventUrls.length > 0) {
-      debug('Setting up eventhub connection ', eventUrls[0])
-      chain.eventHubConnect('grpc://'+eventUrls[0])
-    }
-  }
   if (vaultUrl != undefined && vaultToken != undefined) {
     debug('Vault url & token were passed. Using vault: ', vaultUrl)
     var vault = vaultkv.newVaultKeyValStore(vaultUrl, vaultToken)
@@ -35,13 +30,50 @@ function * setupChain (chainName, caAddr, peers, eventHubUrls, keystoreLocation,
   } else {
     debug('Vault or file store location was not specified. Subsequent calls will fail!')
   }
-  if(devMode !== undefined) {
+  if (devMode !== undefined) {
     debug('Setting devmode of chain to ', devMode)
     chain.setDevMode(devMode)
   }
+  if (ehUrls != undefined) {
+    eventHubUrls = ehUrls.split(',')
+    yield* connectToEventHub()
+  } else {
+    debug('No eventHub Urls provided, so not connecting to eventhub')
+  }
 }
 
-function * getUser (name) {
+function* connectToEventHub() {
+  if (eventHubUrls.length > 0) {
+    if (currentPeerForEventHub == -1) {
+      debug('This is the initial connection request')
+    }
+    currentPeerForEventHub++
+    if (currentPeerForEventHub >= eventHubUrls.length) {
+      debug('All the peers have been tried, starting from beginning again')
+      currentPeerForEventHub = 0
+    }
+    var backoffDuration = 1000
+    while (currentPeerForEventHub < eventHubUrls.length) {
+      try {
+        debug('Setting connected flag to false in Eventhub to allow reconnection to different peer')
+        getEventHub().connected = false
+        debug('Setting up eventhub connection with ', eventHubUrls[currentPeerForEventHub])
+        chain.eventHubConnect('grpc://' + eventHubUrls[currentPeerForEventHub])
+        break;
+      } catch (err) {
+        debug('Error while connecting to eventhub', err)
+        debug('Waiting for ', backoffDuration, ' msecs before trying next peer')
+        yield delay(backoffDuration)
+        backoffDuration = backoffDuration * 2
+        currentPeerForEventHub++
+      }
+    }
+  } else {
+    debug('No eventHub Urls provided, so not connecting to eventhub')
+  }
+}
+
+function* getUser(name) {
   var getUser = bluebird.promisify(chain.getUser, {
     context: chain
   })
@@ -49,7 +81,7 @@ function * getUser (name) {
   return user
 }
 
-function * enrollRegistrar (name, passwd) {
+function* enrollRegistrar(name, passwd) {
   debug('Entering enrollRegistrar')
   var user = yield* enrollUser(name, passwd)
   chain.setRegistrar(user)
@@ -57,7 +89,7 @@ function * enrollRegistrar (name, passwd) {
   return user
 }
 
-function * enrollUser (name, passwd) {
+function* enrollUser(name, passwd) {
   debug('Entering enrollUser')
   var client = yield* getUser(name)
   debug('Successfully got the user ', name)
@@ -83,11 +115,11 @@ function * enrollUser (name, passwd) {
   return client
 }
 
-function getRegistrar () {
+function getRegistrar() {
   return chain.getRegistrar()
 }
 
-function * registerUser (name, affiliation, isRegistrar = false , attrs) {
+function* registerUser(name, affiliation, isRegistrar = false, attrs) {
   debug('Entering registerUser')
   var user = yield* getUser(name)
   var registerUsr = bluebird.promisify(user.register, {
@@ -114,7 +146,7 @@ function * registerUser (name, affiliation, isRegistrar = false , attrs) {
   return secret
 }
 
-function * getTCert (user, attrs) {
+function* getTCert(user, attrs) {
   debug('Getting TCert for user')
   var getTCert = bluebird.promisify(user.getUserCert, {
     context: user
@@ -123,7 +155,7 @@ function * getTCert (user, attrs) {
   return cert
 }
 
-function * deployChaincode (user, args, chaincodePath, attrs = null) {
+function* deployChaincode(user, args, chaincodePath, attrs = null) {
   debug('Entering deployChaincode')
   var cert = yield* getTCert(user, attrs)
   var deployRequest = {
@@ -137,7 +169,7 @@ function * deployChaincode (user, args, chaincodePath, attrs = null) {
   return deployTx
 }
 
-function * queryChaincode (user, fn, args, chaincodeID, attrs = null) {
+function* queryChaincode(user, fn, args, chaincodeID, attrs = null) {
   debug('Entering queryChaincode')
   var queryRequest = {
     chaincodeID: chaincodeID,
@@ -152,7 +184,7 @@ function * queryChaincode (user, fn, args, chaincodeID, attrs = null) {
   return queryTx
 }
 
-function * invokeChaincode (user, fn, args, chaincodeID, attrs = null) {
+function* invokeChaincode(user, fn, args, chaincodeID, attrs = null) {
   debug('Entering invokeChaincode')
   var invokeRequest = {
     chaincodeID: chaincodeID,
@@ -168,19 +200,32 @@ function * invokeChaincode (user, fn, args, chaincodeID, attrs = null) {
 }
 
 function setDeployWaitTime(secs) {
-    chain.setDeployWaitTime(secs)
+  chain.setDeployWaitTime(secs)
 }
 
 function setInvokeWaitTime(secs) {
-    chain.setInvokeWaitTime(secs)
+  chain.setInvokeWaitTime(secs)
 }
 
 function disconnectEventHub(secs) {
-    chain.eventHubDisconnect()
+  chain.eventHubDisconnect()
 }
 
-function getEventhub() {
-    return chain.getEventhub();
+function getEventHub() {
+  return chain.getEventHub();
+}
+
+function isEventHubDisconnectError(e) {
+  var isEventHubError = false
+  try {
+    var o = JSON.parse(e.message)
+    if (o.description == 'EOF' && o.grpc_status == 14) {
+      isEventHubError = true
+    }
+  } catch (err) {
+    debug('Error message is not JSON:', e.message)
+  }
+  return isEventHubError
 }
 
 module.exports = {
@@ -188,7 +233,7 @@ module.exports = {
   setDeployWaitTime: setDeployWaitTime,
   setInvokeWaitTime: setInvokeWaitTime,
   disconnectEventHub: disconnectEventHub,
-  getEventhub: getEventhub,
+  getEventHub: getEventHub,
   getUser: bluebird.coroutine(getUser),
   setupChain: bluebird.coroutine(setupChain),
   enrollUser: bluebird.coroutine(enrollUser),
@@ -196,5 +241,7 @@ module.exports = {
   registerUser: bluebird.coroutine(registerUser),
   deployChaincode: bluebird.coroutine(deployChaincode),
   queryChaincode: bluebird.coroutine(queryChaincode),
-  invokeChaincode: bluebird.coroutine(invokeChaincode)
+  invokeChaincode: bluebird.coroutine(invokeChaincode),
+  isEventHubDisconnectError, isEventHubDisconnectError,
+  connectToEventHub: bluebird.coroutine(connectToEventHub)
 }

@@ -1,6 +1,6 @@
 {
   "name": "hfc-util",
-  "version": "0.0.6",
+  "version": "0.0.7",
   "description": "Wrapper functions for interacting with hyperledger fabric using hfc",
   "main": "index.js",
   "repository": {
@@ -22,6 +22,7 @@
   "dependencies": {
     "bluebird": "^3.5.0",
     "debug": "^2.6.6",
+    "delay": "^2.0.0",
     "hfc": "^0.6.1",
     "vault-hfc-kvstore": "0.0.2"
   }
